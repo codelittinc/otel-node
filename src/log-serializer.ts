@@ -1,7 +1,7 @@
 import { serializeErrorBase } from "./log-errors.js";
 import { scrubErrorText } from "./log-scrub.js";
 
-/** The `err` serializer: an allowlisted, scrubbed copy of the error chain. Never throws. */
+/** Serializes one error value to the scrubbed shape `log` exports under `err`: message and stack scrubbed, only allowlisted fields kept, never throws. */
 export function serializeError(value: unknown): unknown {
   try {
     return serializeErrorBase(value);
