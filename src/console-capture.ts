@@ -2,10 +2,13 @@ import { formatWithOptions } from "node:util";
 import type { Logger } from "pino";
 import { createLogger } from "./logger.js";
 import { sanitizeLogValue } from "./log-redact.js";
+import { scrubErrorText } from "./log-scrub.js";
 import { hasLogLineSink } from "./log-sink.js";
 import { currentService } from "./shared-log.js";
 
 const LEVELS = ["warn", "error"] as const;
+/** Values visited per line while expanding collections, as the field sanitizer caps its walk. */
+const MAX_NODES = 5_000;
 type Level = (typeof LEVELS)[number];
 type ConsoleMethod = (...args: unknown[]) => void;
 
@@ -44,19 +47,56 @@ export function releaseConsole(): void {
 }
 
 /**
- * The first Error goes under `err`; every other argument is sanitized like a log field (PII keys
- * redacted, strings scrubbed) before it is formatted into the message.
+ * The first Error goes under `err`. Every other argument is sanitized like a log field (PII keys
+ * redacted at any depth, including inside a Map or Set), then the arguments are formatted, and the
+ * rendered text is scrubbed last: a custom inspect, a toString or a value split across arguments
+ * only takes its final shape once formatted.
  */
 function exportLine(logger: Logger, level: Level, args: unknown[]): void {
   if (!hasLogLineSink()) return;
   try {
     const err = args.find((arg) => arg instanceof Error);
-    const rest = args.filter((arg) => arg !== err).map(sanitizeLogValue);
-    const message = rest.length > 0 ? formatWithOptions({ colors: false }, ...rest) : undefined;
+    const budget = { nodes: 0 };
+    const rest = args
+      .filter((arg) => arg !== err)
+      .map((arg) => sanitizeLogValue(expandCollections(arg, budget, new WeakSet())));
+    const message =
+      rest.length > 0 ? scrubErrorText(formatWithOptions({ colors: false }, ...rest)) : undefined;
     if (err === undefined) logger[level](message ?? "");
     else if (message === undefined) logger[level]({ err });
     else logger[level]({ err }, message);
   } catch {
     // the console line is already written
+  }
+}
+
+/**
+ * A copy in which every Map becomes a plain object and every Set an array, so the field sanitizer
+ * sees their keys; a byte view becomes `{ bytes }`. The sanitizer treats these as opaque, which is
+ * safe in a JSON log line (a Map serializes as `{}`) but not in console formatting, which prints
+ * their contents. Errors, dates, URLs and toJSON values are left to the sanitizer.
+ */
+function expandCollections(
+  value: unknown,
+  budget: { nodes: number },
+  seen: WeakSet<object>,
+): unknown {
+  if (typeof value !== "object" || value === null) return value;
+  if (++budget.nodes > MAX_NODES) return "[truncated]";
+  if (ArrayBuffer.isView(value)) return { bytes: value.byteLength };
+  if (value instanceof Error || value instanceof Date || value instanceof URL) return value;
+  if (typeof (value as { toJSON?: unknown }).toJSON === "function") return value;
+  if (seen.has(value)) return "[circular]";
+  seen.add(value);
+  try {
+    const expand = (item: unknown) => expandCollections(item, budget, seen);
+    if (value instanceof Map) {
+      return Object.fromEntries([...value].map(([key, item]) => [String(key), expand(item)]));
+    }
+    if (value instanceof Set) return [...value].map(expand);
+    if (Array.isArray(value)) return value.map(expand);
+    return Object.fromEntries(Object.entries(value).map(([key, item]) => [key, expand(item)]));
+  } finally {
+    seen.delete(value);
   }
 }
