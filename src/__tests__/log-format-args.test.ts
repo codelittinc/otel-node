@@ -64,4 +64,19 @@ describe("format args are sanitized like the log object", () => {
     expect(String(records[0]!.msg)).toContain('"code":"23505"');
     expect(String(records[0]!.msg)).toContain('"message":"duplicate key for [redacted]"');
   });
+
+  // Format args are the sanitized, inert values: no Date or function hook of the caller's runs
+  // after the sanitizer, so these renderings are intended.
+  it.each([
+    ["date %s", new Date(0), "date 1970-01-01T00:00:00.000Z"],
+    ["date %d", new Date(0), "date NaN"],
+    ["re %s", /x/, "re [object Object]"],
+    ["map %s", new Map([["a", 1]]), "map [object Object]"],
+    ["fn %s", function named() {}, "fn undefined"],
+    ["fn %o", function named() {}, "fn %o"],
+  ])("renders %s as the sanitized value", (format, value, expected) => {
+    const { logger, records } = createTestLogger();
+    (logger.info as (...args: unknown[]) => void).call(logger, format, value);
+    expect(records[0]!.msg).toBe(expected);
+  });
 });

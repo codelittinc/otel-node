@@ -2,10 +2,11 @@ import { diag, DiagLogLevel } from "@opentelemetry/api";
 import { resolveTelemetryConfig } from "./config.js";
 import { diagLogger, logSafely } from "./log-safely.js";
 import { addSensitiveKeys } from "./log-redact.js";
-import { applyOptions, logScope } from "./options.js";
+import { applyOptions, logScope, sameOptions } from "./options.js";
 import { startProfiling, stopProfiling } from "./profiling.js";
 let sdk;
 let started;
+let applied;
 /**
  * Boots the OpenTelemetry Node SDK. Never rejects: a failed start is logged and the config
  * is returned. Telemetry starts once per process; a restart after `shutdownTelemetry` is not
@@ -13,16 +14,26 @@ let started;
  * registered here, so this module must run under `node --import` before the app loads `http`.
  * The SDK itself is imported only once telemetry is enabled. A host that runs bundled CommonJS
  * (Next.js) passes `esmLoaderHook: false`. The log scope, `redactKeys` and `onError` apply even
- * when export is off, since they shape stdout and error reporting too.
+ * when export is off, since they shape stdout and error reporting too. The first call's options
+ * win whether or not it exported; a later call may only turn export on through its `env`, and
+ * warns `telemetry_restart_ignored` when its options differ.
  */
 export async function startTelemetry(options) {
-    if (started)
-        return started;
-    applyOptions(options);
-    if (options.redactKeys)
-        addSensitiveKeys(options.redactKeys);
-    const env = options.env ?? process.env;
-    const config = resolveTelemetryConfig(options.serviceName, env);
+    let effective;
+    let env;
+    let config;
+    try {
+        effective = resolveOptions(options);
+        if (started)
+            return started;
+        env = effective.env ?? process.env;
+        config = resolveTelemetryConfig(effective.serviceName, env);
+    }
+    catch (error) {
+        logSafely("warn", { err: error, event: "telemetry_start_failed" }, "telemetry_start_failed");
+        const name = typeof options?.serviceName === "string" ? options.serviceName : "unknown";
+        return { ...resolveTelemetryConfig(name, {}), enabled: false };
+    }
     if (!config.enabled) {
         await startProfiling(config, env);
         return config;
@@ -33,11 +44,11 @@ export async function startTelemetry(options) {
         const { bootSdk } = await import("./sdk-boot.js");
         sdk = await bootSdk(config, {
             logScope: logScope(),
-            ignoredPaths: options.ignoredPaths ?? [],
-            esmLoaderHook: options.esmLoaderHook !== false,
-            exportLogs: options.logs !== false,
-            metricViews: options.metricViews,
-            instrumentations: options.instrumentations,
+            ignoredPaths: effective.ignoredPaths ?? [],
+            esmLoaderHook: effective.esmLoaderHook !== false,
+            exportLogs: effective.logs !== false,
+            metricViews: effective.metricViews,
+            instrumentations: effective.instrumentations,
         });
         logSafely("info", {
             event: "telemetry_started",
@@ -51,6 +62,20 @@ export async function startTelemetry(options) {
     }
     await startProfiling(config, env);
     return config;
+}
+/** The first call's options, applied once; a later call keeps them and only brings its `env`. */
+function resolveOptions(options) {
+    if (applied) {
+        if (!sameOptions(applied, options)) {
+            logSafely("warn", { event: "telemetry_restart_ignored" }, "telemetry_restart_ignored");
+        }
+        return { ...applied, env: options.env };
+    }
+    applyOptions(options);
+    if (options.redactKeys)
+        addSensitiveKeys(options.redactKeys);
+    applied = options;
+    return options;
 }
 /** True once `startTelemetry` has booted the SDK in this process. */
 export function isTelemetryStarted() {
@@ -69,6 +94,7 @@ export function startedBullmqTelemetry() {
  */
 export async function shutdownTelemetry(timeoutMs = 5_000) {
     started = undefined;
+    applied = undefined;
     const running = sdk;
     sdk = undefined;
     const timeout = new Promise((resolve) => setTimeout(resolve, timeoutMs).unref());

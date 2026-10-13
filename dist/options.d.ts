@@ -34,5 +34,7 @@ export declare function applyOptions(options: TelemetryOptions): void;
 export declare function logScope(): string;
 /** Calls the app's error hook, if any, with `service` set; never throws. */
 export declare function reportError(err: unknown, context?: ErrorHookContext): void;
+/** True when two calls pass the same options; `env` aside, since it only says whether to export. */
+export declare function sameOptions(a: TelemetryOptions, b: TelemetryOptions): boolean;
 /** Test seam: forgets the recorded options. */
 export declare function resetOptions(): void;

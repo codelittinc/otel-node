@@ -7,7 +7,9 @@ import { type TelemetryOptions } from "./options.js";
  * registered here, so this module must run under `node --import` before the app loads `http`.
  * The SDK itself is imported only once telemetry is enabled. A host that runs bundled CommonJS
  * (Next.js) passes `esmLoaderHook: false`. The log scope, `redactKeys` and `onError` apply even
- * when export is off, since they shape stdout and error reporting too.
+ * when export is off, since they shape stdout and error reporting too. The first call's options
+ * win whether or not it exported; a later call may only turn export on through its `env`, and
+ * warns `telemetry_restart_ignored` when its options differ.
  */
 export declare function startTelemetry(options: TelemetryOptions): Promise<TelemetryConfig>;
 /** True once `startTelemetry` has booted the SDK in this process. */

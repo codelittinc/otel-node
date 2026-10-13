@@ -72,6 +72,16 @@ describe("captureConsole", () => {
     expect(record!.attributes.err).toMatchObject({ type: "Error" });
   });
 
+  // WHY: the exported line must read like the console line, so a Loki search finds it.
+  it("puts an Error's scrubbed message where a format directive takes it", async () => {
+    const err = new Error("charge for 123-45-6789 declined");
+    console.error("charge failed: %s", err);
+    const [record] = await flushLogs();
+    expect(record!.body).toBe("charge failed: charge for [redacted] declined");
+    expect(record!.attributes.err).toMatchObject({ type: "Error" });
+    expect(JSON.stringify(record)).not.toContain("123-45-6789");
+  });
+
   // WHY: arguments are sanitized one by one, so a value split across them only takes its shape
   // once they are joined; the joined message is scrubbed again.
   it("scrubs an SSN formed only once %s arguments are joined", async () => {

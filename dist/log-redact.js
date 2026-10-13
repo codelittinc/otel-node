@@ -2,6 +2,7 @@ import { serializeError } from "./log-serializer.js";
 import { scrubMessage } from "./log-scrub.js";
 import { stripQuery } from "./redact.js";
 import { describePatterns } from "./scrub-descriptor.js";
+import { isAppKey } from "./app-keys.js";
 // Matches PII and credential key names (camelCase, snake_case, kebab-case) at any depth.
 // `ssn`, `dob` and `ein` are anchored so words such as "businessName", "adobe" or "protein"
 // stay readable; a camelCase `...Ein` is matched case-sensitively in isSensitiveKey.
@@ -24,22 +25,9 @@ export const LOG_REDACT_PATTERNS = describePatterns({
     PERSON_ID,
     RECORD_ID,
 });
-/** App-supplied key names, lower-cased; redacted on top of the patterns above. */
-const extraKeys = new Set();
-/** Adds key names (matched whole, any letter case) to the redacted set; a default stays. */
-export function addSensitiveKeys(keys) {
-    for (const key of keys) {
-        const name = key.trim().toLowerCase();
-        if (name)
-            extraKeys.add(name);
-    }
-}
-/** Test seam: forgets the app-supplied keys. */
-export function resetSensitiveKeys() {
-    extraKeys.clear();
-}
+export { addAppKeys as addSensitiveKeys, resetAppKeys as resetSensitiveKeys } from "./app-keys.js";
 export function isSensitiveKey(key) {
-    if (extraKeys.size > 0 && extraKeys.has(key.toLowerCase()))
+    if (isAppKey(key))
         return true;
     if (PERSON_ID.test(key))
         return true;
@@ -174,8 +162,12 @@ function walk(value, depth, state) {
         return converted.value;
     const target = converted.value;
     // What a toJSON returns is walked like any value: a returned date, map or toJSON is reduced too.
-    if (target !== value)
+    // A primitive result (a Decimal's string) costs no depth.
+    if (target !== value) {
+        if (typeof target !== "object" || target === null)
+            return walk(target, depth, state);
         return depth > MAX_DEPTH ? TRUNCATED : walk(target, depth + 1, state);
+    }
     if (state.ancestors.has(target))
         return "[circular]";
     if (depth > MAX_DEPTH)

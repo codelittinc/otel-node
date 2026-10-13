@@ -1,4 +1,5 @@
 import type { Attributes } from "@opentelemetry/api";
+import { isAppAttributeKey } from "./app-keys.js";
 import { scrubMessage } from "./log-scrub.js";
 import { describeKeySets, describePatterns } from "./scrub-descriptor.js";
 import { stripUserinfo, URL_AUTHORITY } from "./url-credentials.js";
@@ -100,7 +101,8 @@ function scrubExceptionStacktrace(stacktrace: string, exceptionType?: string): s
  * Scrubs one attribute set. Every URL attribute loses its query, fragment and userinfo, and its
  * path becomes the span's `http.route` template when it has one, so a path parameter never
  * leaves. Without a route (client spans, unmatched requests) `url.path` is dropped and known
- * token-bearing paths are templated in the remaining URL attributes.
+ * token-bearing paths are templated in the remaining URL attributes. An attribute named by the
+ * app's `redactKeys` (its whole name or last `.` segment) is redacted.
  */
 export function scrubAttributes(
   attributes: Attributes,
@@ -115,7 +117,7 @@ export function scrubAttributes(
     if (redis && STATEMENT_KEYS.includes(key)) continue;
     if (key === "url.path" && !route) continue;
 
-    if (REDACTED_KEYS.has(key)) {
+    if (REDACTED_KEYS.has(key) || isAppAttributeKey(key)) {
       scrubbed[key] = "[redacted]";
     } else if (key === "exception.stacktrace") {
       if (typeof value === "string") {
