@@ -5,10 +5,10 @@ import { describePatterns } from "./scrub-descriptor.js";
  * the web page (`/apply/[token]`) and the api routes it calls. Any letter case and any run of `/`
  * match, as a server routes them alike.
  */
-export const TOKEN_PATH_TEMPLATES = [
-    [/^\/+v1\/+applications\/+by-token\/+[^/?#]+/i, "/v1/applications/by-token/:token"],
-    [/^\/+apply\/+[^/?#]+/i, "/apply/[token]"],
-];
+export const TOKEN_PATH_TEMPLATES = Object.freeze([
+    Object.freeze([/^\/+v1\/+applications\/+by-token\/+[^/?#]+/i, "/v1/applications/by-token/:token"]),
+    Object.freeze([/^\/+apply\/+[^/?#]+/i, "/apply/[token]"]),
+]);
 // A `scheme:` chain and `//`, or a bare `//`, then the host.
 const ORIGIN = /^((?:[a-z][a-z0-9+.-]*:)*\/\/[^/?#]*)(.*)$/is;
 // An `http.route` is a template only when it is a path.

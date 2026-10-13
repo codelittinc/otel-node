@@ -1,6 +1,6 @@
 import type { Attributes } from "@opentelemetry/api";
-/** `schemeless` reads a value with no scheme and no leading `/` as starting at its authority. */
-export declare function stripQuery(url: string, schemeless?: boolean): string;
+import { stripQuery } from "./strip-query.js";
+export { stripQuery };
 /** Pinned by scrub-contract.test.ts: the agent's layer-2 span scrub repeats these. */
 export declare const REDACT_PATTERNS: Readonly<Record<"URL_AUTHORITY" | "URL_QUERY_START" | "NAMED_REQUEST" | "FRAME_LINE", import("./scrub-descriptor.js").PatternDescriptor>>;
 export declare const REDACT_KEY_SETS: Readonly<Record<"URL_KEYS" | "DROPPED_KEYS" | "REDACTED_KEYS" | "DROPPED_PREFIXES" | "STATEMENT_KEYS" | "NAME_KEYS" | "REDIS_SYSTEM_KEYS", readonly string[]>>;
