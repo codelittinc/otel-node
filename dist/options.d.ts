@@ -28,7 +28,20 @@ export interface TelemetryOptions {
     /** False keeps log lines on stdout only; a host whose own code does not use the shared logger. */
     logs?: boolean;
 }
-/** Records the options that outlive `startTelemetry`: the log scope and the error hook. */
+/** A checked copy of the caller's options, and the types of the redact keys it dropped. */
+export interface CheckedOptions {
+    options: TelemetryOptions;
+    invalidKeyTypes: string[];
+}
+/**
+ * Validates and copies options without touching any state. Throws on options that cannot be read;
+ * a redact key that is not a string is dropped and only its type is reported.
+ */
+export declare function checkOptions(input: TelemetryOptions): CheckedOptions;
+/**
+ * Applies checked options in one step: the log scope, the error hook and the redact keys. Nothing
+ * here can throw, so a call never leaves its options half-applied.
+ */
 export declare function applyOptions(options: TelemetryOptions): void;
 /** The configured log scope; before `startTelemetry`, the service name from the environment. */
 export declare function logScope(): string;

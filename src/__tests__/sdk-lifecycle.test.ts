@@ -264,4 +264,12 @@ describe("telemetry lifecycle", () => {
     state.shutdownThrows = true;
     await expect(shutdownTelemetry(100)).resolves.toBeUndefined();
   });
+
+  // WHY: options that cannot be read on a later call must not report export off while it runs.
+  it("returns the running config for unreadable options on a later call", async () => {
+    const first = await startTelemetry({ serviceName: "api", env: enabled });
+    const warn = vi.spyOn(telemetryLog, "warn").mockImplementation(() => undefined);
+    await expect(startTelemetry(null as never)).resolves.toBe(first);
+    warn.mockRestore();
+  });
 });

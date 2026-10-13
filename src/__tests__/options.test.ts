@@ -6,7 +6,7 @@ import { scrubAttributes } from "../redact.js";
 import { installFatalHandlers } from "../fatal.js";
 import { buildInstrumentations } from "../instrumentations.js";
 import { isSensitiveKey, resetSensitiveKeys } from "../log-redact.js";
-import { resetOptions } from "../options.js";
+import { logScope, resetOptions } from "../options.js";
 import { shutdownTelemetry, startTelemetry } from "../sdk.js";
 import { log } from "../shared-log.js";
 import { createTestLogger } from "../testing.js";
@@ -123,16 +123,57 @@ describe("a second startTelemetry call", () => {
 });
 
 describe("startTelemetry with bad options", () => {
-  // WHY: an untyped caller can pass anything; telemetry must never break the app's boot.
-  it("resolves and logs telemetry_start_failed for a non-string redact key", async () => {
+  // WHY: an untyped caller can pass anything; telemetry must never break the app's boot, and one
+  // bad key must not cost the app every good one.
+  it("keeps the valid redact keys and warns with only a bad entry's type", async () => {
     const warn = vi.spyOn(telemetryLog, "warn").mockImplementation(() => undefined);
     await expect(
-      startTelemetry({ serviceName: "api", env: {}, redactKeys: [42 as unknown as string] }),
+      startTelemetry({
+        serviceName: "api",
+        env: {},
+        redactKeys: ["unitLabel", 4111111111111111, { secret: "hunter2" }] as unknown as string[],
+      }),
+    ).resolves.toMatchObject({ enabled: false });
+    expect(isSensitiveKey("unitLabel")).toBe(true);
+    const calls = warn.mock.calls.filter(
+      ([fields]) => (fields as { event?: string }).event === "invalid_redact_key",
+    );
+    expect(calls).toEqual([
+      [{ event: "invalid_redact_key", types: ["number", "object"] }, "invalid_redact_key"],
+    ]);
+    expect(JSON.stringify(warn.mock.calls)).not.toMatch(/hunter2|4111111111111111/);
+  });
+
+  it("leaves no option applied when a call cannot be read, and a later call applies in full", async () => {
+    const warn = vi.spyOn(telemetryLog, "warn").mockImplementation(() => undefined);
+    await expect(
+      startTelemetry({
+        serviceName: "api",
+        env: {},
+        logScope: "half",
+        redactKeys: ["roomCode"],
+        onError: 5 as unknown as () => void,
+      }),
     ).resolves.toMatchObject({ enabled: false });
     expect(warn).toHaveBeenCalledWith(
       expect.objectContaining({ event: "telemetry_start_failed" }),
       "telemetry_start_failed",
     );
+    expect(logScope()).not.toBe("half");
+    expect(isSensitiveKey("roomCode")).toBe(false);
+
+    await startTelemetry({ serviceName: "api", env: {}, logScope: "acp", redactKeys: ["unitLabel"] });
+    expect(logScope()).toBe("acp");
+    expect(isSensitiveKey("unitLabel")).toBe(true);
+    expect(warn).not.toHaveBeenCalledWith(
+      expect.objectContaining({ event: "telemetry_restart_ignored" }),
+      expect.anything(),
+    );
+  });
+
+  it("resolves for options that are not an object", async () => {
+    vi.spyOn(telemetryLog, "warn").mockImplementation(() => undefined);
+    await expect(startTelemetry(null as never)).resolves.toMatchObject({ enabled: false });
   });
 });
 
@@ -144,6 +185,30 @@ describe("redactKeys on spans", () => {
     expect(
       scrubAttributes({ unitLabel: "4B", "acp.unit_label": "x", "acp.UNITLABEL": "4C", queue: "q" }),
     ).toEqual({ unitLabel: "[redacted]", "acp.unit_label": "x", "acp.UNITLABEL": "[redacted]", queue: "q" });
+  });
+
+  // WHY: a generic app key (a bare `name` for a person's name) must not wipe the OpenTelemetry
+  // attributes that traces are searched and grouped by.
+  it("matches a last segment only outside OpenTelemetry's namespaces", async () => {
+    await startTelemetry({
+      serviceName: "api",
+      env: {},
+      redactKeys: ["name", "route", "method", "id", "type"],
+    });
+    const kept = {
+      "db.system.name": "postgresql",
+      "http.route": "/v1/tenants/:id",
+      "http.request.method": "GET",
+      "messaging.destination.name": "late-fees",
+      "bullmq.job.id": "42",
+      "error.type": "TimeoutError",
+      "exception.type": "Error",
+    };
+    expect(scrubAttributes({ ...kept, "acp.tenant.name": "Jane", name: "Jane" })).toEqual({
+      ...kept,
+      "acp.tenant.name": "[redacted]",
+      name: "[redacted]",
+    });
   });
 
   it("leaves span attributes alone when the app sets no keys", () => {
