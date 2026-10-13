@@ -6,3 +6,5 @@ export { captureConsole } from "./console-capture.js";
 export { installFatalHandlers } from "./fatal.js";
 export { boundedLabel } from "./bounded.js";
 export { currentTraceparent, withLinkedSpan, withRootSpan } from "./trace-context.js";
+export { serializeError } from "./log-serializer.js";
+export { traceLogFields } from "./log-fields.js";

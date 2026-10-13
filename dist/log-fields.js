@@ -1,5 +1,5 @@
 import { isSpanContextValid, trace } from "@opentelemetry/api";
-/** Trace correlation fields for the active span; empty outside a valid span. */
+/** Returns the active span's `trace_id` and `span_id`, or `{}` when there is no active span. */
 export function traceLogFields() {
     const spanContext = trace.getActiveSpan()?.spanContext();
     if (!spanContext || !isSpanContextValid(spanContext))
