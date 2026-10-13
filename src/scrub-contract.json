@@ -1,0 +1,128 @@
+{
+  "SENSITIVE_KEY_PATTERN": {
+    "source": "(^ssn|ssn$|ssn.?(enc|last)|_ssn|social.?security|^dob|dob$|dob.?enc|_dob|date.?of.?birth|birth.?date|account.?number|routing.?number|tax.?id|taxpayer|(^|_)ein(_?number)?$|e.?mail|phone|password|passwd|secret|token|api.?key|authorization|cookie|holder.?name|iban|passport|drivers?.?license|birthday|bank.?account|aba.?number|clerk.?auth|signature$|enc$|enc.?snapshot$|(first|last|middle|full|legal|preferred|given|family).?name|surname|(occupant|caller|contact|payee|bill.?to|tenant|resident|applicant|guarantor|performed.?by|assignee|recipient|signer).?name|(street|mailing|home|billing|residential|postal).?address|^address(.?line)?.?\\d*$|address.?line|address$|forwarding.?address|^street\\d*$|^line[12]$|mobile|name.?on.?account|postal.?code|^zip|zip.?code)",
+    "flags": "i"
+  },
+  "CAMEL_EIN": {
+    "source": "[a-z](Ein|EIN)(Number)?$",
+    "flags": ""
+  },
+  "PERSON_ID": {
+    "source": "(tax|taxpayer|national|government|passport|license|licence|ssn).?(id|ids)$",
+    "flags": "i"
+  },
+  "RECORD_ID": {
+    "source": "(Id|ID|Ids|IDs|_id|_ids)$",
+    "flags": ""
+  },
+  "SSN_SHAPE": {
+    "source": "\\b\\d{3}-\\d{2}-\\d{4}\\b",
+    "flags": "g"
+  },
+  "EMAIL_DOMAIN": {
+    "source": "@[A-Za-z0-9-]+(?:\\.[A-Za-z0-9-]+)*\\.[A-Za-z]{2,}\\b",
+    "flags": "g"
+  },
+  "EMAIL_LOCAL_CHAR": {
+    "source": "[A-Za-z0-9._%+-]",
+    "flags": ""
+  },
+  "LONG_DIGIT_RUN": {
+    "source": "(?<![\\w-])\\d{8,}(?![\\w-])",
+    "flags": "g"
+  },
+  "URL_TOKEN": {
+    "source": "[^ \\n\\r]+",
+    "flags": "g"
+  },
+  "URL_START": {
+    "source": "(?<![a-z0-9+.-])[0-9+.-]*[a-z][a-z0-9+.-]*:(?:\\/\\/|\\\\\\/\\\\\\/)|(?<![\\w.~%+:/@-])(?:[0-9+.-]*[a-z][a-z0-9+.-]*:\\/(?!\\/)|\\/\\/)",
+    "flags": "gi"
+  },
+  "USERINFO_END": {
+    "source": "[`<>]",
+    "flags": ""
+  },
+  "URL_END": {
+    "source": "[\\s`<>]",
+    "flags": ""
+  },
+  "QUOTE_END": {
+    "source": "[\"'](?=$|[\\s,;:}\\])>\"'&])",
+    "flags": "y"
+  },
+  "USERINFO_QUOTE": {
+    "source": "'[)']",
+    "flags": "y"
+  },
+  "HOST_PORT": {
+    "source": "^(?:\\[[^\\]]*\\]|[^:[\\]]+)(?::\\d*)?$",
+    "flags": ""
+  },
+  "QUERY_START": {
+    "source": "[?#;]",
+    "flags": ""
+  },
+  "PATH_IN_TEXT": {
+    "source": "(^|\\s)(\\/[^\\s?#;]*)[?#;]\\S*",
+    "flags": "g"
+  },
+  "URL_AUTHORITY": {
+    "source": "^\\s*(?:(?:[0-9+.-]*[a-z][a-z0-9+.-]*:)+(?:\\/\\/?|\\\\\\/\\\\\\/)|\\/\\/)",
+    "flags": "i"
+  },
+  "URL_QUERY_START": {
+    "source": "[?#;]",
+    "flags": ""
+  },
+  "NAMED_REQUEST": {
+    "source": "^([A-Z]+) ((?:\\/|[a-z][a-z0-9+.-]*:\\/\\/|[^\\s/?#@]*@)\\S*)$",
+    "flags": "i"
+  },
+  "FRAME_LINE": {
+    "source": "^\\s+at ",
+    "flags": ""
+  },
+  "ORIGIN": {
+    "source": "^((?:[a-z][a-z0-9+.-]*:)*\\/\\/[^/?#]*)(.*)$",
+    "flags": "is"
+  },
+  "TOKEN_PATH_TEMPLATES": [
+    {
+      "source": "^\\/+v1\\/+applications\\/+by-token\\/+[^/?#]+",
+      "flags": "i",
+      "replacement": "/v1/applications/by-token/:token"
+    },
+    {
+      "source": "^\\/+apply\\/+[^/?#]+",
+      "flags": "i",
+      "replacement": "/apply/[token]"
+    }
+  ],
+  "URL_KEYS": ["http.target", "http.url", "url.full", "url.original", "url.path"],
+  "DROPPED_KEYS": [
+    "bullmq.job.progress",
+    "bullmq.job.result",
+    "client.address",
+    "http.request.body",
+    "http.response.body",
+    "network.peer.address",
+    "url.query"
+  ],
+  "REDACTED_KEYS": ["bullmq.job.failed.reason", "exception.message"],
+  "DROPPED_PREFIXES": [
+    "db.operation.parameter.",
+    "db.query.parameter.",
+    "enduser.",
+    "http.request.header.",
+    "http.response.header.",
+    "messaging.message.body",
+    "user."
+  ],
+  "STATEMENT_KEYS": ["db.query.text", "db.statement"],
+  "NAME_KEYS": ["next.span_name"],
+  "REDIS_SYSTEM_KEYS": ["db.system", "db.system.name"],
+  "REDIS_SYSTEM": "redis",
+  "ROUTE_TEMPLATE_PREFIX": "/",
+  "REDACTED_STATUS_KEY": "message"
+}
