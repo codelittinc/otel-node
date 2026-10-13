@@ -1,4 +1,5 @@
 import { afterAll, beforeAll, beforeEach, describe, expect, it, vi } from "vitest";
+import { inspect } from "node:util";
 import { logs } from "@opentelemetry/api-logs";
 import { captureConsole, releaseConsole } from "../console-capture.js";
 import { log } from "../shared-log.js";
@@ -69,6 +70,56 @@ describe("captureConsole", () => {
     const [record] = await flushLogs();
     expect(JSON.stringify(record)).not.toContain("4111111111111111");
     expect(record!.attributes.err).toMatchObject({ type: "Error" });
+  });
+
+  // WHY: arguments are sanitized one by one, so a value split across them only takes its shape
+  // once they are joined; the joined message is scrubbed again.
+  it("scrubs an SSN formed only once %s arguments are joined", async () => {
+    console.error("ssn %s-%s", "123-45", "6789");
+    const [record] = await flushLogs();
+    expect(JSON.stringify(record)).not.toContain("123-45-6789");
+    expect(record!.body).toBe("ssn [redacted]");
+  });
+
+  it("scrubs an account number formed only once arguments are joined", async () => {
+    console.error("refund to %s%s", "4111111", "111111111");
+    const [record] = await flushLogs();
+    expect(JSON.stringify(record)).not.toContain("4111111111111111");
+  });
+
+  it("scrubs a second Error's message and stack", async () => {
+    console.error(new Error("first"), new Error("applicant 123-45-6789 failed"));
+    const [record] = await flushLogs();
+    expect(JSON.stringify(record)).not.toContain("123-45-6789");
+  });
+
+  // WHY: the logger's JSON shows a Map as {}, but the console format shows its entries.
+  it("redacts a PII key inside a Map, a Set and a class instance", async () => {
+    class Lookup {
+      readonly owner = new Map<string, unknown>([["password", "hunter2"]]);
+    }
+    console.error(
+      "lookup failed",
+      new Map([["phone", "555-0100"]]),
+      new Set([{ ssn: "987654321" }]),
+      new Lookup(),
+      new Uint8Array([104, 117, 110]),
+    );
+    const [record] = await flushLogs();
+    const text = JSON.stringify(record);
+    expect(text).not.toMatch(/555-0100|987654321|hunter2/);
+    expect(text).not.toContain("104, 117, 110");
+  });
+
+  // WHY: what is checked must be what is exported; a custom inspect, toString or toJSON renders
+  // text the field sanitizer never walked.
+  it("scrubs what custom inspect, toString and toJSON render", async () => {
+    const custom = { [inspect.custom]: () => "ssn 123-45-6789" };
+    const stringy = { toString: () => "account 4111111111111111" };
+    const json = { toJSON: () => ({ email: "jane@example.com", note: "123-45-6789" }) };
+    console.error("a %s b %O c %j d", stringy, custom, json);
+    const [record] = await flushLogs();
+    expect(JSON.stringify(record)).not.toMatch(/123-45-6789|4111111111111111|jane@example\.com/);
   });
 
   // WHY: with no logScope set, the scope filter must still keep the app's own lines.
