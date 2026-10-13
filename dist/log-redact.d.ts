@@ -6,8 +6,10 @@ export declare function addSensitiveKeys(keys: Iterable<string>): void;
 export declare function resetSensitiveKeys(): void;
 export declare function isSensitiveKey(key: string): boolean;
 /**
- * The JSON-facing form of an object: URL, Buffer and toJSON values converted; `done` stops the
- * walk.
+ * The JSON-facing form of an object: URL, byte view, date and toJSON values converted; `done`
+ * stops the walk. A done value is inert: a plain string or object, so no serialization hook of
+ * the caller's (an own toJSON on a Map, a Date subclass) runs after the sanitizer. A Map, Set or
+ * RegExp becomes `{}`, as JSON shows one without own properties.
  */
 export declare function convert(value: object): {
     done: boolean;

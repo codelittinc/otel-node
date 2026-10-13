@@ -91,7 +91,9 @@ function prismaMeta(err: ErrorRecord): ErrorRecord | undefined {
   const target = read(meta, "target");
   const modelName = read(meta, "modelName");
   const out: ErrorRecord = {};
-  if (typeof target === "string" || Array.isArray(target)) out.target = target;
+  // Column names only: an array keeps its strings, so no caller object reaches the serializer.
+  if (typeof target === "string") out.target = target;
+  else if (Array.isArray(target)) out.target = target.filter((item) => typeof item === "string");
   if (typeof modelName === "string") out.modelName = modelName;
   return out;
 }
@@ -133,7 +135,15 @@ function sanitizeFields(err: ErrorRecord, depth: number, ancestors: WeakSet<obje
 
   const stack = str(read(err, "stack"));
   if (stack !== undefined) {
-    out.stack = scrubStack(stack, safe === undefined ? undefined : `${name ?? "Error"}: ${safe}`);
+    // A message that is not a string is rendered into the stack header by the runtime, through
+    // its own toString; the header then names the type only.
+    const header =
+      safe !== undefined
+        ? `${name ?? "Error"}: ${safe}`
+        : rawMessage === undefined && read(err, "message") !== undefined
+          ? out.type
+          : undefined;
+    out.stack = scrubStack(stack, header as string | undefined);
   }
 
   for (const key of [...COMMON_KEYS, ...family.keys]) {
@@ -169,7 +179,8 @@ export function safeErrorMessage(value: unknown): string {
     if (!err) return scrubErrorText(String(value));
     const { raw, name } = nameOf(err);
     const safe = familyOf(raw ?? "", err).message?.(err, name ?? "Error");
-    const message = safe ?? scrubErrorText(String(read(err, "message") ?? ""));
+    // A string message only: String() would run a caller object's toString or toPrimitive.
+    const message = safe ?? scrubErrorText(str(read(err, "message")) ?? "");
     return message === "" ? typeOf(err, name) : message;
   } catch {
     return "[unserializable error]";

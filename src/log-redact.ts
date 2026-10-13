@@ -69,20 +69,28 @@ function isOpaque(value: object): boolean {
     value instanceof Map ||
     value instanceof Set ||
     value instanceof RegExp ||
-    value instanceof ArrayBuffer ||
-    ArrayBuffer.isView(value)
+    value instanceof ArrayBuffer
   );
 }
 
+/** A date as JSON shows it, read with the built-in method so a subclass cannot change it. */
+function isoDate(value: Date): string | null {
+  return Number.isNaN(Date.prototype.getTime.call(value))
+    ? null
+    : Date.prototype.toISOString.call(value);
+}
+
 /**
- * The JSON-facing form of an object: URL, Buffer and toJSON values converted; `done` stops the
- * walk.
+ * The JSON-facing form of an object: URL, byte view, date and toJSON values converted; `done`
+ * stops the walk. A done value is inert: a plain string or object, so no serialization hook of
+ * the caller's (an own toJSON on a Map, a Date subclass) runs after the sanitizer. A Map, Set or
+ * RegExp becomes `{}`, as JSON shows one without own properties.
  */
 export function convert(value: object): { done: boolean; value: unknown } {
   if (value instanceof URL) return { done: true, value: scrubMessage(stripQuery(value.href)) };
-  if (Buffer.isBuffer(value)) return { done: true, value: { bytes: value.length } };
-  if (value instanceof Date) return { done: true, value };
-  if (isOpaque(value)) return { done: true, value };
+  if (ArrayBuffer.isView(value)) return { done: true, value: { bytes: value.byteLength } };
+  if (value instanceof Date) return { done: true, value: isoDate(value) };
+  if (isOpaque(value)) return { done: true, value: {} };
   const toJSON = (value as { toJSON?: unknown }).toJSON;
   if (typeof toJSON === "function") return { done: false, value: toJSON.call(value) };
   return { done: false, value };
@@ -96,9 +104,7 @@ export function convert(value: object): { done: boolean; value: unknown } {
 export function plainFields(fields: object, nested = false): Record<string, unknown> {
   if (ArrayBuffer.isView(fields)) return { bytes: fields.byteLength };
   if (Array.isArray(fields)) return { value: fields };
-  if (fields instanceof Date) {
-    return { value: Number.isNaN(fields.getTime()) ? null : fields.toISOString() };
-  }
+  if (fields instanceof Date) return { value: isoDate(fields) };
   if (fields instanceof Map) return { value: Object.fromEntries(fields) };
   const { value } = convert(fields);
   if (value === fields) return fields as Record<string, unknown>;
@@ -164,13 +170,15 @@ function keyedEntries(target: object): {
 function walk(value: unknown, depth: number, state: WalkState): unknown {
   if (++state.nodes > MAX_NODES) return TRUNCATED;
   if (typeof value === "string") return scrubMessage(value);
+  // JSON drops a function; returning it would let its own toJSON run after the sanitizer.
+  if (typeof value === "function") return undefined;
   if (typeof value !== "object" || value === null) return value;
   if (value instanceof Error) return serializeError(value);
   const converted = convert(value);
   if (converted.done) return converted.value;
   const target = converted.value;
-  if (typeof target === "string") return scrubMessage(target);
-  if (typeof target !== "object" || target === null) return target;
+  // What a toJSON returns is walked like any value: a returned date, map or toJSON is reduced too.
+  if (target !== value) return depth > MAX_DEPTH ? TRUNCATED : walk(target, depth + 1, state);
   if (state.ancestors.has(target)) return "[circular]";
   if (depth > MAX_DEPTH) return TRUNCATED;
   state.ancestors.add(target);
@@ -186,7 +194,11 @@ function walk(value: unknown, depth: number, state: WalkState): unknown {
       }
       if (isSensitiveKey(k)) out[key] = REDACTED;
       else if (ERROR_KEYS.has(k)) out[key] = walkErrorValue(child, depth + 1, state);
-      else out[key] = walk(child, depth + 1, state);
+      else {
+        // A dropped value (a function) leaves no key, as in JSON, so it cannot shadow a method.
+        const walked = walk(child, depth + 1, state);
+        if (walked !== undefined) out[key] = walked;
+      }
     }
     return out;
   } finally {
