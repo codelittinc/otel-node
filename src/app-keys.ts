@@ -21,50 +21,83 @@ export function isAppKey(key: string): boolean {
 }
 
 /**
- * OpenTelemetry semantic-convention namespaces, and those of the instrumentations this package and
- * its apps load. Their attributes are matched by whole name only, so a generic app key (`name`,
- * `id`) never wipes `db.system.name` or `bullmq.job.id`.
+ * Attributes the package's instrumentations, BullMQ and Prisma emit whose last segment is a
+ * plausible generic app key (`name`, `id`, `method`). Only these exact names skip last-segment
+ * matching, so `name` never wipes `db.system.name`, while an app's own `http.unitLabel` is still
+ * redacted. Content-bearing attributes (`url.full`, `db.query.text`, job options and reasons) are
+ * deliberately absent. Prisma's bare `name`, `method` and `model` are not exempt: a whole-name app
+ * key matches them.
  */
-const OTEL_NAMESPACES = new Set([
-  "bullmq",
-  "client",
-  "code",
-  "db",
-  "deployment",
-  "enduser",
-  "error",
-  "exception",
-  "host",
-  "http",
-  "messaging",
-  "net",
-  "network",
-  "next",
-  "nodejs",
-  "otel",
-  "peer",
-  "pg",
-  "prisma",
-  "process",
-  "rpc",
-  "server",
-  "service",
-  "telemetry",
-  "thread",
-  "url",
-  "user",
-  "user_agent",
-  "v8js",
+export const EXEMPT_ATTRIBUTES: ReadonlySet<string> = new Set([
+  // http and undici
+  "http.request.method",
+  "http.request.method_original",
+  "http.response.status_code",
+  "http.route",
+  "server.address",
+  "server.port",
+  "network.peer.port",
+  "network.protocol.version",
+  "url.scheme",
+  "error.type",
+  "user_agent.synthetic.type",
+  // ioredis, pg and Prisma
+  "db.system.name",
+  "db.operation.name",
+  "db.namespace",
+  "db.client.connection.pool.name",
+  "db.client.connection.state",
+  // messaging semantic conventions
+  "messaging.destination.name",
+  // bullmq: names and identifiers
+  "bullmq.queue.name",
+  "bullmq.queue.operation",
+  "bullmq.job.name",
+  "bullmq.job.id",
+  "bullmq.job.ids",
+  "bullmq.job.key",
+  "bullmq.job.type",
+  "bullmq.job.state",
+  "bullmq.job.scheduler.id",
+  "bullmq.worker.name",
+  "bullmq.worker.id",
+  "bullmq.flow.name",
+  "bullmq.queue.jobs.state",
+  // bullmq: counts and timings
+  "bullmq.job.attempts.made",
+  "bullmq.job.bulk.count",
+  "bullmq.job.processed.timestamp",
+  "bullmq.job.attempt_finished_timestamp",
+  "bullmq.job.duration",
+  "bullmq.queue.drain.delay",
+  "bullmq.queue.grace",
+  "bullmq.queue.clean.limit",
+  "bullmq.queue.clean.count",
+  "bullmq.queue.rate.limit",
+  "bullmq.queue.event.max.length",
+  "bullmq.worker.rate.limit",
+  "bullmq.worker.do.not.wait.active",
+  "bullmq.worker.force.close",
+  "bullmq.worker.stalled.jobs",
+  "bullmq.worker.failed.jobs",
+  "bullmq.worker.jobs.to.extend.locks",
+  "bullmq.jobs.completed",
+  "bullmq.jobs.failed",
+  "bullmq.jobs.delayed",
+  "bullmq.jobs.retried",
+  "bullmq.jobs.waiting",
+  "bullmq.jobs.waiting_children",
+  // exception events
+  "exception.type",
 ]);
 
 /**
- * A span attribute is an app key when its whole name is one, or, outside the OpenTelemetry
- * namespaces, when its last `.` segment is one (`acp.tenant.name`).
+ * A span attribute is an app key when its whole name is one, or its last `.` segment is one,
+ * unless it is an exempt instrumentation attribute.
  */
 export function isAppAttributeKey(key: string): boolean {
   if (appKeys.size === 0) return false;
   if (isAppKey(key)) return true;
-  const dot = key.indexOf(".");
-  if (dot === -1 || OTEL_NAMESPACES.has(key.slice(0, dot).toLowerCase())) return false;
+  if (EXEMPT_ATTRIBUTES.has(key)) return false;
   return isAppKey(key.slice(key.lastIndexOf(".") + 1));
 }

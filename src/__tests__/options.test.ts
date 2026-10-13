@@ -3,6 +3,7 @@ import { afterEach, describe, expect, it, vi } from "vitest";
 import { InstrumentationBase } from "@opentelemetry/instrumentation";
 import { log as telemetryLog } from "../log-safely.js";
 import { scrubAttributes } from "../redact.js";
+import { EXEMPT_ATTRIBUTES } from "../app-keys.js";
 import { installFatalHandlers } from "../fatal.js";
 import { buildInstrumentations } from "../instrumentations.js";
 import { isSensitiveKey, resetSensitiveKeys } from "../log-redact.js";
@@ -189,7 +190,7 @@ describe("redactKeys on spans", () => {
 
   // WHY: a generic app key (a bare `name` for a person's name) must not wipe the OpenTelemetry
   // attributes that traces are searched and grouped by.
-  it("matches a last segment only outside OpenTelemetry's namespaces", async () => {
+  it("keeps the listed semantic-convention attributes from a generic key", async () => {
     await startTelemetry({
       serviceName: "api",
       env: {},
@@ -209,6 +210,42 @@ describe("redactKeys on spans", () => {
       "acp.tenant.name": "[redacted]",
       name: "[redacted]",
     });
+  });
+
+  it("keeps every listed attribute from keys built from their own last segments", async () => {
+    const keys = [...EXEMPT_ATTRIBUTES].map((name) => name.slice(name.lastIndexOf(".") + 1));
+    await startTelemetry({ serviceName: "api", env: {}, redactKeys: keys });
+    const attributes = Object.fromEntries([...EXEMPT_ATTRIBUTES].map((name) => [name, "v"]));
+    expect(scrubAttributes(attributes)).toEqual(attributes);
+  });
+
+  // WHY: an attribute the app sets under an OpenTelemetry namespace is still the app's data; only
+  // the exact names the instrumentations emit are exempt.
+  it("redacts an unlisted attribute under an OpenTelemetry namespace", async () => {
+    await startTelemetry({ serviceName: "api", env: {}, redactKeys: ["unitLabel", "name"] });
+    expect(
+      scrubAttributes({
+        "http.unitLabel": "4B",
+        "db.unitlabel": "4B",
+        "messaging.unitLabel": "4B",
+        "bullmq.job.tenant.name": "Jane",
+        "db.system.name": "postgresql",
+      }),
+    ).toEqual({
+      "http.unitLabel": "[redacted]",
+      "db.unitlabel": "[redacted]",
+      "messaging.unitLabel": "[redacted]",
+      "bullmq.job.tenant.name": "[redacted]",
+      "db.system.name": "postgresql",
+    });
+  });
+
+  // Prisma sets bare `name`, `method` and `model`; a whole-name app key matches them.
+  it("redacts Prisma's bare attributes under a whole-name key", async () => {
+    await startTelemetry({ serviceName: "api", env: {}, redactKeys: ["name", "model"] });
+    expect(scrubAttributes({ name: "Tenant.findMany", model: "Tenant", method: "findMany" })).toEqual(
+      { name: "[redacted]", model: "[redacted]", method: "findMany" },
+    );
   });
 
   it("leaves span attributes alone when the app sets no keys", () => {
