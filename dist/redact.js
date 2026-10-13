@@ -1,8 +1,10 @@
 import { isAppAttributeKey } from "./app-keys.js";
 import { scrubMessage } from "./log-scrub.js";
 import { describeKeySets, describePatterns } from "./scrub-descriptor.js";
-import { stripUserinfo, URL_AUTHORITY } from "./url-credentials.js";
+import { stripQuery, URL_QUERY_START } from "./strip-query.js";
+import { URL_AUTHORITY } from "./url-credentials.js";
 import { routeTemplateOf, templateUrlPath, TOKEN_PATH_TEMPLATES } from "./url-path.js";
+export { stripQuery };
 const URL_KEYS = new Set(["url.full", "url.original", "http.url", "http.target", "url.path"]);
 const DROPPED_KEYS = new Set([
     "url.query",
@@ -28,15 +30,7 @@ const STATEMENT_KEYS = ["db.statement", "db.query.text"];
 // A span with either key set to this is a Redis call, whose statement quotes the values it sent.
 const REDIS_SYSTEM_KEYS = ["db.system.name", "db.system"];
 const REDIS_SYSTEM = "redis";
-const URL_QUERY_START = /[?#;]/;
 const FRAME_LINE = /^\s+at /;
-/** `schemeless` reads a value with no scheme and no leading `/` as starting at its authority. */
-export function stripQuery(url, schemeless = false) {
-    // Userinfo first: a password can hold a `?` or `#`.
-    const withoutUserinfo = stripUserinfo(url, schemeless);
-    const cut = withoutUserinfo.search(URL_QUERY_START);
-    return cut === -1 ? withoutUserinfo : withoutUserinfo.slice(0, cut);
-}
 // `METHOD /path`, `METHOD scheme://host/path` or `METHOD user@host/path`.
 const NAMED_REQUEST = /^([A-Z]+) ((?:\/|[a-z][a-z0-9+.-]*:\/\/|[^\s/?#@]*@)\S*)$/i;
 const NAME_KEYS = new Set(["next.span_name"]);

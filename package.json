@@ -29,6 +29,10 @@
       "types": "./dist/register.d.ts",
       "default": "./dist/register.js"
     },
+    "./scrub": {
+      "types": "./dist/scrub-entry.d.ts",
+      "default": "./dist/scrub-entry.js"
+    },
     "./url-credentials": {
       "types": "./dist/url-credentials.d.ts",
       "default": "./dist/url-credentials.js"

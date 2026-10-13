@@ -6,10 +6,10 @@ import { describePatterns } from "./scrub-descriptor.js";
  * the web page (`/apply/[token]`) and the api routes it calls. Any letter case and any run of `/`
  * match, as a server routes them alike.
  */
-export const TOKEN_PATH_TEMPLATES: readonly (readonly [RegExp, string])[] = [
-  [/^\/+v1\/+applications\/+by-token\/+[^/?#]+/i, "/v1/applications/by-token/:token"],
-  [/^\/+apply\/+[^/?#]+/i, "/apply/[token]"],
-];
+export const TOKEN_PATH_TEMPLATES: readonly (readonly [RegExp, string])[] = Object.freeze([
+  Object.freeze([/^\/+v1\/+applications\/+by-token\/+[^/?#]+/i, "/v1/applications/by-token/:token"] as const),
+  Object.freeze([/^\/+apply\/+[^/?#]+/i, "/apply/[token]"] as const),
+]);
 
 // A `scheme:` chain and `//`, or a bare `//`, then the host.
 const ORIGIN = /^((?:[a-z][a-z0-9+.-]*:)*\/\/[^/?#]*)(.*)$/is;
