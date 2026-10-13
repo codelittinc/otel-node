@@ -1,8 +1,7 @@
 import { diag, DiagLogLevel } from "@opentelemetry/api";
 import { resolveTelemetryConfig } from "./config.js";
 import { diagLogger, logSafely } from "./log-safely.js";
-import { addSensitiveKeys } from "./log-redact.js";
-import { applyOptions, logScope, sameOptions } from "./options.js";
+import { applyOptions, checkOptions, logScope, sameOptions, } from "./options.js";
 import { startProfiling, stopProfiling } from "./profiling.js";
 let sdk;
 let started;
@@ -31,6 +30,8 @@ export async function startTelemetry(options) {
     }
     catch (error) {
         logSafely("warn", { err: error, event: "telemetry_start_failed" }, "telemetry_start_failed");
+        if (started)
+            return started;
         const name = typeof options?.serviceName === "string" ? options.serviceName : "unknown";
         return { ...resolveTelemetryConfig(name, {}), enabled: false };
     }
@@ -64,16 +65,18 @@ export async function startTelemetry(options) {
     return config;
 }
 /** The first call's options, applied once; a later call keeps them and only brings its `env`. */
-function resolveOptions(options) {
+function resolveOptions(input) {
+    const { options, invalidKeyTypes } = checkOptions(input);
     if (applied) {
         if (!sameOptions(applied, options)) {
             logSafely("warn", { event: "telemetry_restart_ignored" }, "telemetry_restart_ignored");
         }
         return { ...applied, env: options.env };
     }
+    if (invalidKeyTypes.length > 0) {
+        logSafely("warn", { event: "invalid_redact_key", types: invalidKeyTypes }, "invalid_redact_key");
+    }
     applyOptions(options);
-    if (options.redactKeys)
-        addSensitiveKeys(options.redactKeys);
     applied = options;
     return options;
 }

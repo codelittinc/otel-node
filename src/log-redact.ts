@@ -29,7 +29,7 @@ export const LOG_REDACT_PATTERNS = describePatterns({
   RECORD_ID,
 });
 
-export { addAppKeys as addSensitiveKeys, resetAppKeys as resetSensitiveKeys } from "./app-keys.js";
+export { resetAppKeys as resetSensitiveKeys } from "./app-keys.js";
 
 export function isSensitiveKey(key: string): boolean {
   if (isAppKey(key)) return true;

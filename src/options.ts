@@ -1,4 +1,5 @@
 import type { Instrumentation } from "@opentelemetry/instrumentation";
+import { addAppKeys } from "./app-keys.js";
 import type { TelemetryEnv } from "./config.js";
 
 /** An allowlist view: instruments named `<instrumentPrefix>*` export only these attributes. */
@@ -36,11 +37,47 @@ let scope: string | undefined;
 let service: string | undefined;
 let errorHook: TelemetryOptions["onError"];
 
-/** Records the options that outlive `startTelemetry`: the log scope and the error hook. */
+/** A checked copy of the caller's options, and the types of the redact keys it dropped. */
+export interface CheckedOptions {
+  options: TelemetryOptions;
+  invalidKeyTypes: string[];
+}
+
+function check(ok: boolean, message: string): void {
+  if (!ok) throw new TypeError(message);
+}
+
+/**
+ * Validates and copies options without touching any state. Throws on options that cannot be read;
+ * a redact key that is not a string is dropped and only its type is reported.
+ */
+export function checkOptions(input: TelemetryOptions): CheckedOptions {
+  check(typeof input === "object" && input !== null, "options must be an object");
+  const options = { ...input };
+  check(typeof options.serviceName === "string", "serviceName must be a string");
+  check(options.logScope === undefined || typeof options.logScope === "string", "bad logScope");
+  check(options.onError === undefined || typeof options.onError === "function", "bad onError");
+  check(options.env === undefined || typeof options.env === "object", "bad env");
+  check(options.redactKeys === undefined || Array.isArray(options.redactKeys), "bad redactKeys");
+  const keys: unknown[] = [...(options.redactKeys ?? [])];
+  const invalidKeyTypes = keys
+    .filter((key) => typeof key !== "string")
+    .map((key) => (key === null ? "null" : typeof key));
+  if (options.redactKeys) {
+    options.redactKeys = keys.filter((key): key is string => typeof key === "string");
+  }
+  return { options, invalidKeyTypes };
+}
+
+/**
+ * Applies checked options in one step: the log scope, the error hook and the redact keys. Nothing
+ * here can throw, so a call never leaves its options half-applied.
+ */
 export function applyOptions(options: TelemetryOptions): void {
   scope = options.logScope?.trim() || options.serviceName;
   service = options.serviceName;
   errorHook = options.onError;
+  if (options.redactKeys) addAppKeys(options.redactKeys);
 }
 
 /** The configured log scope; before `startTelemetry`, the service name from the environment. */
