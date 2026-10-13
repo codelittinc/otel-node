@@ -1,6 +1,7 @@
 import { formatWithOptions } from "node:util";
 import type { Logger } from "pino";
 import { createLogger } from "./logger.js";
+import { safeErrorMessage } from "./log-errors.js";
 import { sanitizeLogValue } from "./log-redact.js";
 import { scrubErrorText } from "./log-scrub.js";
 import { hasLogLineSink } from "./log-sink.js";
@@ -45,19 +46,18 @@ export function releaseConsole(): void {
 }
 
 /**
- * The first Error goes under `err`. Every other argument is reduced to what the logger would
- * export for it, then the arguments are formatted, and the rendered text is scrubbed last: a value
- * split across arguments only takes its final shape once formatted.
+ * The first Error goes under `err`, and its safe message takes its place in the text, so a `%s`
+ * still reads as on the console. Every other argument is reduced to what the logger would export
+ * for it, then the arguments are formatted, and the rendered text is scrubbed last: a value split
+ * across arguments only takes its final shape once formatted.
  */
 function exportLine(logger: Logger, level: Level, args: unknown[]): void {
   if (!hasLogLineSink()) return;
   try {
     const err = args.find((arg) => arg instanceof Error);
-    const rest = args.filter((arg) => arg !== err).map(asLogged);
-    const message =
-      rest.length > 0 ? scrubErrorText(formatWithOptions({ colors: false }, ...rest)) : undefined;
-    if (err === undefined) logger[level](message ?? "");
-    else if (message === undefined) logger[level]({ err });
+    const parts = args.map((arg) => (arg === err ? safeErrorMessage(err) : asLogged(arg)));
+    const message = scrubErrorText(formatWithOptions({ colors: false }, ...parts));
+    if (err === undefined) logger[level](message);
     else logger[level]({ err }, message);
   } catch {
     // the console line is already written

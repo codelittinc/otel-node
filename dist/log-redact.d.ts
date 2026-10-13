@@ -1,9 +1,6 @@
 /** Pinned by scrub-contract.test.ts: the agent's layer-2 log scrub repeats these patterns. */
 export declare const LOG_REDACT_PATTERNS: Readonly<Record<"SENSITIVE_KEY_PATTERN" | "CAMEL_EIN" | "PERSON_ID" | "RECORD_ID", import("./scrub-descriptor.js").PatternDescriptor>>;
-/** Adds key names (matched whole, any letter case) to the redacted set; a default stays. */
-export declare function addSensitiveKeys(keys: Iterable<string>): void;
-/** Test seam: forgets the app-supplied keys. */
-export declare function resetSensitiveKeys(): void;
+export { addAppKeys as addSensitiveKeys, resetAppKeys as resetSensitiveKeys } from "./app-keys.js";
 export declare function isSensitiveKey(key: string): boolean;
 /**
  * The JSON-facing form of an object: URL, byte view, date and toJSON values converted; `done`

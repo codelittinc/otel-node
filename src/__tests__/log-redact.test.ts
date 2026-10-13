@@ -216,4 +216,14 @@ describe("value conversion", () => {
     expect(JSON.stringify(records[0])).not.toContain(VALUE);
     expect(records[0]).toMatchObject({ a: { name: "n" } });
   });
+
+  // WHY: a Prisma Decimal logs as the string its toJSON returns; depth must not cost it its value.
+  it("keeps a primitive toJSON result at depth 9", () => {
+    const decimal = { toJSON: () => "12.5000" };
+    let nested: Record<string, unknown> = { amount: decimal };
+    for (let i = 0; i < 7; i++) nested = { d: nested };
+    const { logger, records } = createTestLogger();
+    logger.info({ d: nested }, "m");
+    expect(JSON.stringify(records[0])).toContain('"amount":"12.5000"');
+  });
 });

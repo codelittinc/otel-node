@@ -18,6 +18,7 @@ export declare function scrubSpanName(name: string, route: string | undefined, t
  * Scrubs one attribute set. Every URL attribute loses its query, fragment and userinfo, and its
  * path becomes the span's `http.route` template when it has one, so a path parameter never
  * leaves. Without a route (client spans, unmatched requests) `url.path` is dropped and known
- * token-bearing paths are templated in the remaining URL attributes.
+ * token-bearing paths are templated in the remaining URL attributes. An attribute named by the
+ * app's `redactKeys` (its whole name or last `.` segment) is redacted.
  */
 export declare function scrubAttributes(attributes: Attributes, tokenPaths?: readonly (readonly [RegExp, string])[]): Attributes;

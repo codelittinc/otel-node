@@ -102,6 +102,7 @@ describe("serialization hooks", () => {
     if (typeof placed === "object" && placed !== null) logger.error(placed, "as the object");
     expect(records.length).toBeGreaterThanOrEqual(2);
     expect(JSON.stringify(records)).not.toMatch(LEAK);
+    expect(JSON.stringify(records)).not.toContain("log_redaction_failed");
   });
 
   it.each(CASES)("console capture: %s, %s", async (_hook, _position, value) => {
@@ -110,6 +111,9 @@ describe("serialization hooks", () => {
     const records = await flushLogs();
     expect(records).toHaveLength(2);
     expect(JSON.stringify(records.map((r) => [r.body, r.attributes]))).not.toMatch(LEAK);
+    expect(JSON.stringify(records.map((r) => [r.body, r.attributes]))).not.toContain(
+      "log_redaction_failed",
+    );
   });
 
   // An error is serialized deny-by-default; its message and Prisma's meta target are the fields
@@ -126,6 +130,7 @@ describe("serialization hooks", () => {
     logger.error(withMessage);
     logger.error({ err: prisma }, "prisma");
     expect(JSON.stringify(records)).not.toMatch(LEAK);
+    expect(JSON.stringify(records)).not.toContain("log_redaction_failed");
   });
 
   it.each(HOOKS)("console capture: %s as an error's message", async (_hook, make) => {
@@ -134,5 +139,8 @@ describe("serialization hooks", () => {
     const records = await flushLogs();
     expect(records).toHaveLength(2);
     expect(JSON.stringify(records.map((r) => [r.body, r.attributes]))).not.toMatch(LEAK);
+    expect(JSON.stringify(records.map((r) => [r.body, r.attributes]))).not.toContain(
+      "log_redaction_failed",
+    );
   });
 });
