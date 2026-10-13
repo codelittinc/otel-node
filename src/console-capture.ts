@@ -7,8 +7,6 @@ import { hasLogLineSink } from "./log-sink.js";
 import { currentService } from "./shared-log.js";
 
 const LEVELS = ["warn", "error"] as const;
-/** Values visited per line while expanding collections, as the field sanitizer caps its walk. */
-const MAX_NODES = 5_000;
 type Level = (typeof LEVELS)[number];
 type ConsoleMethod = (...args: unknown[]) => void;
 
@@ -47,19 +45,15 @@ export function releaseConsole(): void {
 }
 
 /**
- * The first Error goes under `err`. Every other argument is sanitized like a log field (PII keys
- * redacted at any depth, including inside a Map or Set), then the arguments are formatted, and the
- * rendered text is scrubbed last: a custom inspect, a toString or a value split across arguments
- * only takes its final shape once formatted.
+ * The first Error goes under `err`. Every other argument is reduced to what the logger would
+ * export for it, then the arguments are formatted, and the rendered text is scrubbed last: a value
+ * split across arguments only takes its final shape once formatted.
  */
 function exportLine(logger: Logger, level: Level, args: unknown[]): void {
   if (!hasLogLineSink()) return;
   try {
     const err = args.find((arg) => arg instanceof Error);
-    const budget = { nodes: 0 };
-    const rest = args
-      .filter((arg) => arg !== err)
-      .map((arg) => sanitizeLogValue(expandCollections(arg, budget, new WeakSet())));
+    const rest = args.filter((arg) => arg !== err).map(asLogged);
     const message =
       rest.length > 0 ? scrubErrorText(formatWithOptions({ colors: false }, ...rest)) : undefined;
     if (err === undefined) logger[level](message ?? "");
@@ -71,32 +65,22 @@ function exportLine(logger: Logger, level: Level, args: unknown[]): void {
 }
 
 /**
- * A copy in which every Map becomes a plain object and every Set an array, so the field sanitizer
- * sees their keys; a byte view becomes `{ bytes }`. The sanitizer treats these as opaque, which is
- * safe in a JSON log line (a Map serializes as `{}`) but not in console formatting, which prints
- * their contents. Errors, dates, URLs and toJSON values are left to the sanitizer.
+ * An argument as the logger's JSON line would carry it: sanitized (bounded, PII keys redacted),
+ * then through JSON, so console formatting has nothing left to print that the line would not
+ * hold. No function, Map or Set contents, getter, custom inspect or toString survives.
  */
-function expandCollections(
-  value: unknown,
-  budget: { nodes: number },
-  seen: WeakSet<object>,
-): unknown {
-  if (typeof value !== "object" || value === null) return value;
-  if (++budget.nodes > MAX_NODES) return "[truncated]";
+function asLogged(arg: unknown): unknown {
+  if (typeof arg === "function") return "[Function]";
+  const sanitized = sanitizeLogValue(arg);
+  if (typeof sanitized !== "object" || sanitized === null) return sanitized;
+  const json = JSON.stringify(sanitized, jsonSafe);
+  return json === undefined ? undefined : (JSON.parse(json) as unknown);
+}
+
+/** A byte view becomes its size, a Map or Set `{}`, a bigint its digits. */
+function jsonSafe(_key: string, value: unknown): unknown {
+  if (typeof value === "bigint") return value.toString();
   if (ArrayBuffer.isView(value)) return { bytes: value.byteLength };
-  if (value instanceof Error || value instanceof Date || value instanceof URL) return value;
-  if (typeof (value as { toJSON?: unknown }).toJSON === "function") return value;
-  if (seen.has(value)) return "[circular]";
-  seen.add(value);
-  try {
-    const expand = (item: unknown) => expandCollections(item, budget, seen);
-    if (value instanceof Map) {
-      return Object.fromEntries([...value].map(([key, item]) => [String(key), expand(item)]));
-    }
-    if (value instanceof Set) return [...value].map(expand);
-    if (Array.isArray(value)) return value.map(expand);
-    return Object.fromEntries(Object.entries(value).map(([key, item]) => [key, expand(item)]));
-  } finally {
-    seen.delete(value);
-  }
+  if (value instanceof Map || value instanceof Set) return {};
+  return value;
 }

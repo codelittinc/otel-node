@@ -28,7 +28,7 @@ export function buildInstrumentations(
     }),
     new UndiciInstrumentation(),
     new IORedisInstrumentation({ requireParentSpan: true }),
-    // SQL text only, never bound values (Prisma 7 runs every query through `pg`).
+    // SQL text only, never bound values.
     new PgInstrumentation({ enhancedDatabaseReporting: false, requireParentSpan: true }),
     ...appInstrumentations,
   ];

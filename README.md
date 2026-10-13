@@ -78,13 +78,15 @@ Environment: `OTEL_EXPORTER_OTLP_ENDPOINT` (on/off), `OTEL_SDK_DISABLED=true` (k
 
 | Import                                    | What                                                                                                                                                                                                                                       |
 | ----------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
-| `@codelittinc/otel-node`                  | `startTelemetry`, `shutdownTelemetry`, `isTelemetryStarted`, `bullmqTelemetry`, `setHttpRoute`, `getMeter`, `log`, `configureLogger`, `flushLog`, `captureConsole`, `installFatalHandlers`, `boundedLabel`, `currentTraceparent`, `withLinkedSpan`, `withRootSpan`, and the `TelemetryOptions`, `Meter` and `BatchObservableResult` types |
+| `@codelittinc/otel-node`                  | `startTelemetry`, `shutdownTelemetry`, `isTelemetryStarted`, `setHttpRoute`, `getMeter`, `log`, `configureLogger`, `flushLog`, `captureConsole`, `installFatalHandlers`, `boundedLabel`, `currentTraceparent`, `withLinkedSpan`, `withRootSpan`, and the `TelemetryOptions`, `Meter` and `BatchObservableResult` types |
+| `@codelittinc/otel-node/bullmq`           | `bullmqTelemetry()`: the adapter for a BullMQ Queue or Worker `telemetry` option                                                                                                                                                           |
 | `@codelittinc/otel-node/register`         | `node --import` entry, no options                                                                                                                                                                                                          |
 | `@codelittinc/otel-node/testing`          | `createTestLogger()`: the real logger, capturing parsed records in memory                                                                                                                                                                 |
 | `@codelittinc/otel-node/url-credentials`  | URL userinfo and query scrub. Imports nothing from Node or OpenTelemetry, so a browser bundle can use it                                                                                                                                  |
 
-`bullmq` is an optional peer dependency: `bullmqTelemetry()` returns the adapter for a Queue or
-Worker `telemetry` option once telemetry has started, and `undefined` before.
+`bullmq` (`^6.3.8`) is an optional peer dependency, used only by the `./bullmq` entry, so an app
+without it typechecks the main entry even with `skipLibCheck` off. `bullmqTelemetry()` returns
+the adapter once telemetry has started, and `undefined` before.
 
 ## Logging
 
@@ -95,8 +97,11 @@ same scrubbed line is copied to OTLP logs.
 
 An app that logs with `console` calls `captureConsole()` once at startup. Every `console.warn` and
 `console.error` line still reaches the console unchanged, and a scrubbed copy is exported under
-the log scope. `console.log` and `console.info` are left alone. The console copy on stdout is not
-scrubbed: move a line that can carry personal data to `log`.
+the log scope. Each argument is first reduced to what `log` would export for it (PII keys
+redacted, no function, Map or Set contents), and the formatted line is scrubbed last, so the
+exported copy never holds more than a `log` line would. `console.log` and `console.info` are left
+alone. The console copy on stdout is not scrubbed: move a line that can carry personal data to
+`log`. The SDK's own diagnostics (`OTEL_LOG_LEVEL`) bypass the capture and are never exported.
 
 ## The two-layer scrub
 

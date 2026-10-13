@@ -56,7 +56,10 @@ export async function startTelemetry(options) {
 export function isTelemetryStarted() {
     return sdk !== undefined;
 }
-/** The BullMQ adapter built by `startTelemetry`; undefined until telemetry has started. */
+/**
+ * The BullMQ adapter built by `startTelemetry`; undefined until telemetry has started. Typed
+ * `unknown` so this module's types never name bullmq; `./bullmq` gives it its type.
+ */
 export function startedBullmqTelemetry() {
     return sdk?.bullmq;
 }

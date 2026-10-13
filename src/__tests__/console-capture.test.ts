@@ -122,6 +122,49 @@ describe("captureConsole", () => {
     expect(JSON.stringify(record)).not.toMatch(/123-45-6789|4111111111111111|jane@example\.com/);
   });
 
+  // WHY: console formatting prints a function's own properties and, under %s, its source; the
+  // logger's JSON drops functions. Console capture must never export more than `log` would.
+  it("exports no property of a function, top-level or nested", async () => {
+    const handler = Object.assign(function handler() {
+      return "source with hunter2";
+    }, { owner: { firstName: "Zelda", password: "hunter2" } });
+    console.error("b", handler, { cb: handler });
+    console.error("c %s %o", handler, handler);
+    const records = await flushLogs();
+    expect(records).toHaveLength(2);
+    expect(JSON.stringify(records)).not.toMatch(/Zelda|hunter2/);
+  });
+
+  // WHY: the logger's JSON shows a Map or Set as {}, wherever a toJSON put it.
+  it("exports no Map, Set or byte view contents from inside a toJSON result", async () => {
+    const value = {
+      toJSON: () => ({
+        nested: new Set([{ password: "hunter2" }]),
+        map: new Map([["k", "Zelda"]]),
+        bytes: new Uint8Array([104, 117, 110]),
+      }),
+    };
+    console.error("d", value);
+    const [record] = await flushLogs();
+    expect(JSON.stringify(record)).not.toMatch(/hunter2|Zelda|104, 117, 110/);
+  });
+
+  // WHY: the capture runs on the caller's path; a huge array must cost bounded time.
+  it("reads a bounded number of items from a huge array", async () => {
+    let reads = 0;
+    const huge = new Proxy(Array.from({ length: 200_000 }, (_, i) => i), {
+      get(target, key, receiver) {
+        if (typeof key === "string" && /^\d+$/.test(key)) reads++;
+        return Reflect.get(target, key, receiver);
+      },
+    });
+    written.error.mockImplementationOnce(() => undefined);
+    console.error("big", huge);
+    const [record] = await flushLogs();
+    expect(reads).toBeLessThanOrEqual(2_000);
+    expect(record!.body).toMatch(/^big \[/);
+  });
+
   // WHY: with no logScope set, the scope filter must still keep the app's own lines.
   it("exports a console line and a log line under the default scope", async () => {
     console.error("from console");

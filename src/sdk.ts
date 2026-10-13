@@ -1,5 +1,4 @@
 import { diag, DiagLogLevel } from "@opentelemetry/api";
-import type { Telemetry } from "bullmq";
 import { resolveTelemetryConfig, type TelemetryConfig } from "./config.js";
 import type { BootedSdk } from "./sdk-boot.js";
 import { diagLogger, logSafely } from "./log-safely.js";
@@ -63,8 +62,11 @@ export function isTelemetryStarted(): boolean {
   return sdk !== undefined;
 }
 
-/** The BullMQ adapter built by `startTelemetry`; undefined until telemetry has started. */
-export function startedBullmqTelemetry(): Telemetry | undefined {
+/**
+ * The BullMQ adapter built by `startTelemetry`; undefined until telemetry has started. Typed
+ * `unknown` so this module's types never name bullmq; `./bullmq` gives it its type.
+ */
+export function startedBullmqTelemetry(): unknown {
   return sdk?.bullmq;
 }
 
