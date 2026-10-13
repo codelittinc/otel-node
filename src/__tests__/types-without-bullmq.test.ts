@@ -33,16 +33,19 @@ function typeErrors(source: string): string[] {
 
 // WHY: bullmq is an optional peer. An app without it must typecheck the main entry even with
 // skipLibCheck off; only the `./bullmq` entry may name its types.
+// Each case builds a full compiler program, which a cold CI runner takes well over 5 s to do.
+const CI_TIMEOUT = 60_000;
+
 describe("the built types without bullmq installed", () => {
   it("typecheck the main entry", () => {
     const errors = typeErrors(
       'import * as otel from "./dist/index.js";\nexport const start = otel.startTelemetry;\n',
     );
     expect(errors).toEqual([]);
-  });
+  }, CI_TIMEOUT);
 
   it("fail the ./bullmq entry, so bullmq is really hidden", () => {
     const errors = typeErrors('export * from "./dist/bullmq.js";\n');
     expect(errors.join("\n")).toMatch(/bullmq/);
-  });
+  }, CI_TIMEOUT);
 });
