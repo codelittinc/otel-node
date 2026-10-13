@@ -135,6 +135,16 @@ describe("captureConsole", () => {
     expect(JSON.stringify(records)).not.toMatch(/Zelda|hunter2/);
   });
 
+  // WHY: JSON calls a function's own toJSON; the logger drops the function, so capture must too.
+  it("exports nothing from a nested function's own toJSON", async () => {
+    const fj = Object.assign(() => undefined, {
+      toJSON: () => ({ password: "hunter2", note: "Zelda" }),
+    });
+    console.error("x", { cb: fj }, [fj]);
+    const [record] = await flushLogs();
+    expect(JSON.stringify(record)).not.toMatch(/hunter2|Zelda/);
+  });
+
   // WHY: the logger's JSON shows a Map or Set as {}, wherever a toJSON put it.
   it("exports no Map, Set or byte view contents from inside a toJSON result", async () => {
     const value = {
