@@ -6,5 +6,5 @@ import { startedBullmqTelemetry } from "./sdk.js";
  * telemetry has started, which leaves BullMQ on its untraced code path.
  */
 export function bullmqTelemetry(): Telemetry | undefined {
-  return startedBullmqTelemetry();
+  return startedBullmqTelemetry() as Telemetry | undefined;
 }

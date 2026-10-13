@@ -16,8 +16,9 @@ vi.mock("bullmq-otel", () => {
 describe("@codelittinc/otel-node with no endpoint", () => {
   it("loads neither the SDK nor the BullMQ adapter", async () => {
     const telemetry = await import("../index.js");
+    const { bullmqTelemetry } = await import("../bullmq.js");
     expect((await telemetry.startTelemetry({ serviceName: "api", env: {} })).enabled).toBe(false);
-    expect(telemetry.bullmqTelemetry()).toBeUndefined();
+    expect(bullmqTelemetry()).toBeUndefined();
     expect(loaded.modules).toEqual([]);
   });
 });

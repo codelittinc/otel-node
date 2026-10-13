@@ -1,4 +1,3 @@
-import type { Telemetry } from "bullmq";
 import { type TelemetryConfig } from "./config.js";
 import { type TelemetryOptions } from "./options.js";
 /**
@@ -13,8 +12,11 @@ import { type TelemetryOptions } from "./options.js";
 export declare function startTelemetry(options: TelemetryOptions): Promise<TelemetryConfig>;
 /** True once `startTelemetry` has booted the SDK in this process. */
 export declare function isTelemetryStarted(): boolean;
-/** The BullMQ adapter built by `startTelemetry`; undefined until telemetry has started. */
-export declare function startedBullmqTelemetry(): Telemetry | undefined;
+/**
+ * The BullMQ adapter built by `startTelemetry`; undefined until telemetry has started. Typed
+ * `unknown` so this module's types never name bullmq; `./bullmq` gives it its type.
+ */
+export declare function startedBullmqTelemetry(): unknown;
 /**
  * Flushes pending spans, metrics, log records and profiles, bounded so a dead collector cannot
  * stall a shutdown.

@@ -1,7 +1,6 @@
 export { startTelemetry, shutdownTelemetry, isTelemetryStarted } from "./sdk.js";
 export type { TelemetryConfig, TelemetryEnv } from "./config.js";
 export type { ErrorHookContext, MetricViewOptions, TelemetryOptions } from "./options.js";
-export { bullmqTelemetry } from "./bullmq.js";
 export { setHttpRoute } from "./http-route.js";
 export { getMeter, type BatchObservableResult, type Meter } from "./meter.js";
 export { log, configureLogger, flushLog } from "./shared-log.js";
