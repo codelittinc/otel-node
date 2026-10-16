@@ -197,7 +197,11 @@ describe("RedactingSpanExporter — Slack webhook paths", () => {
       `${hook()}/extra`,
       "https://hooks.slack.com/services/[webhook]/extra",
     ],
-    ["no scheme", "//hooks.slack.com/services/T0AAAAAAA/B0BBBBBBB/xoxbSECRETsecret123", "//hooks.slack.com/services/[webhook]"],
+    [
+      "no scheme",
+      "//hooks.slack.com/services/T0AAAAAAA/B0BBBBBBB/xoxbSECRETsecret123",
+      "//hooks.slack.com/services/[webhook]",
+    ],
     ["a bare path", "/services/T0AAAAAAA/B0BBBBBBB/xoxbSECRETsecret123", "/services/[webhook]"],
   ])("templates %s", (_name, url, expected) => {
     const span = exportSpan(SpanKind.CLIENT, { "url.full": url, "http.url": url });
@@ -213,4 +217,75 @@ describe("RedactingSpanExporter — Slack webhook paths", () => {
       expect(span.attributes["url.full"]).toBe(`https://x.test${path}`);
     },
   );
+});
+
+describe("RedactingSpanExporter — Slack webhook paths in events, links and path keys", () => {
+  const SECRETS = ["T0AAAAAAA", "B0BBBBBBB", "xoxbSECRETsecret123"];
+  const URL_IN = `https://hooks.slack.com/services/${SECRETS.join("/")}`;
+  const URL_OUT = "https://hooks.slack.com/services/[webhook]";
+
+  function exportWith(attributes: Attributes) {
+    const memory = new InMemorySpanExporter();
+    const provider = new BasicTracerProvider({
+      spanProcessors: [new SimpleSpanProcessor(new RedactingSpanExporter(memory))],
+    });
+    const tracer = provider.getTracer("t");
+    const linked = {
+      traceId: "0af7651916cd43dd8448eb211c80319c",
+      spanId: "b7ad6b7169203331",
+      traceFlags: 1,
+    };
+    const span = tracer.startSpan("GET", {
+      kind: SpanKind.CLIENT,
+      attributes,
+      links: [{ context: linked, attributes: { "url.full": URL_IN } }],
+    });
+    span.addEvent("retry", { "url.full": URL_IN });
+    span.end();
+    return memory.getFinishedSpans()[0]!;
+  }
+
+  it("templates the URL in an event attribute and a link attribute", () => {
+    const span = exportWith({ "url.full": URL_IN });
+    expect(span.events[0]!.attributes!["url.full"]).toBe(URL_OUT);
+    expect(span.links[0]!.attributes!["url.full"]).toBe(URL_OUT);
+    const text = JSON.stringify({ a: span.attributes, e: span.events, l: span.links });
+    expect(SECRETS.filter((secret) => text.includes(secret))).toEqual([]);
+  });
+
+  it("drops url.path without a route and templates http.target", () => {
+    const span = exportWith({
+      "url.path": `/services/${SECRETS.join("/")}`,
+      "http.target": `/services/${SECRETS.join("/")}?x=1`,
+    });
+    expect(span.attributes["url.path"]).toBeUndefined();
+    expect(span.attributes["http.target"]).toBe("/services/[webhook]");
+  });
+
+  it.each([
+    ["triggers", "/triggers/[webhook]"],
+    ["workflows", "/workflows/[webhook]"],
+  ])("templates a Slack %s webhook path", (word, out) => {
+    for (const url of [
+      `https://hooks.slack.com/${word}/T0AAAAAAA/B0BBBBBBB/xoxbSECRETsecret123?x=1`,
+      `https://hooks.slack.com//${word.toUpperCase()}//T0AAAAAAA//B0BBBBBBB//xoxbSECRETsecret123`,
+    ]) {
+      const span = exportWith({ "url.full": url, "http.url": url });
+      expect(span.attributes["url.full"]).toBe(`https://hooks.slack.com${out}`);
+      expect(span.attributes["http.url"]).toBe(`https://hooks.slack.com${out}`);
+      expect(JSON.stringify(span.attributes)).not.toContain("xoxbSECRET");
+    }
+  });
+
+  it.each([
+    "/triggers",
+    "/triggers/a/b",
+    "/triggersX/a/b/c",
+    "/workflows",
+    "/workflows/a/b",
+    "/workflowsX/a/b/c",
+  ])("leaves %s unchanged", (path) => {
+    const span = exportWith({ "url.full": `https://x.test${path}` });
+    expect(span.attributes["url.full"]).toBe(`https://x.test${path}`);
+  });
 });

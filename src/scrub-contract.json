@@ -102,6 +102,16 @@
       "source": "^\\/+services(?:\\/+[^/?#]+){3}",
       "flags": "i",
       "replacement": "/services/[webhook]"
+    },
+    {
+      "source": "^\\/+triggers(?:\\/+[^/?#]+){3}",
+      "flags": "i",
+      "replacement": "/triggers/[webhook]"
+    },
+    {
+      "source": "^\\/+workflows(?:\\/+[^/?#]+){3}",
+      "flags": "i",
+      "replacement": "/workflows/[webhook]"
     }
   ],
   "URL_KEYS": ["http.target", "http.url", "url.full", "url.original", "url.path"],

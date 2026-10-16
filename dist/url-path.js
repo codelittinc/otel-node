@@ -3,13 +3,15 @@ import { describePatterns } from "./scrub-descriptor.js";
  * Paths whose segments are bearer secrets, with the template each becomes. Anchored at the start
  * of the path. An applicant intake token opens and submits an application for whoever holds it:
  * the web page (`/apply/[token]`) and the api routes it calls. Any letter case and any run of `/`
- * match, as a server routes them alike. A Slack incoming webhook (`/services/<team>/<bot>/<secret>`)
- * is host-agnostic like the rest: all three segments are replaced, the last two being the secret.
+ * match, as a server routes them alike. A Slack webhook (`/services/…`, `/triggers/…`, `/workflows/…`, each
+ * `<a>/<b>/<secret>`) is host-agnostic like the rest: all three segments are replaced.
  */
 export const TOKEN_PATH_TEMPLATES = Object.freeze([
     Object.freeze([/^\/+v1\/+applications\/+by-token\/+[^/?#]+/i, "/v1/applications/by-token/:token"]),
     Object.freeze([/^\/+apply\/+[^/?#]+/i, "/apply/[token]"]),
     Object.freeze([/^\/+services(?:\/+[^/?#]+){3}/i, "/services/[webhook]"]),
+    Object.freeze([/^\/+triggers(?:\/+[^/?#]+){3}/i, "/triggers/[webhook]"]),
+    Object.freeze([/^\/+workflows(?:\/+[^/?#]+){3}/i, "/workflows/[webhook]"]),
 ]);
 // A `scheme:` chain and `//`, or a bare `//`, then the host.
 const ORIGIN = /^((?:[a-z][a-z0-9+.-]*:)*\/\/[^/?#]*)(.*)$/is;
