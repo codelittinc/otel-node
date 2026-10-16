@@ -1,6 +1,6 @@
 {
   "name": "@codelittinc/otel-node",
-  "version": "0.1.1",
+  "version": "0.1.2",
   "description": "In-process OpenTelemetry for Node services: SDK boot, layer-1 PII scrub, OTLP logs.",
   "license": "UNLICENSED",
   "repository": "github:codelittinc/otel-node",

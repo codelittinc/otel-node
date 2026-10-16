@@ -116,8 +116,9 @@ Personal data is removed twice before it is stored.
    plus `redactKeys`), serializes errors deny-by-default, and scrubs SSN shapes, emails and URL
    userinfo and queries from every string. The span exporter drops request and response bodies
    and headers, bound SQL values and Redis statements, redacts exception messages, strips URL
-   queries and userinfo, replaces a URL path with its route template, and redacts any attribute
-   named by `redactKeys`.
+   queries and userinfo, replaces a URL path with its route template, templates token paths (an applicant intake
+   token, and a Slack incoming-webhook path `/services/<team>/<bot>/<secret>` becomes
+   `/services/[webhook]`, whatever the host), and redacts any attribute named by `redactKeys`.
 2. **Layer 2, in the agent.** The Alloy agent in `codelittinc/carbon-observability` repeats the
    pattern scrub on every span, log and metric before it leaves the host. It repeats only this
    package's defaults (the contract below), never an app's `redactKeys`: for those, layer 1 is

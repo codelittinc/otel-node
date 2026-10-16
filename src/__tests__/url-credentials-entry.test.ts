@@ -92,6 +92,12 @@ describe("the scrub entry", () => {
     expect(redactStripQuery).toBe(stripQuery);
   });
 
+  it("templates a Slack webhook URL through the scrub entry", () => {
+    expect(
+      scrubEntry.templateUrlPath("https://hooks.slack.com/services/T0A/B0B/SECRET", undefined),
+    ).toBe("https://hooks.slack.com/services/[webhook]");
+  });
+
   it("exports a token path list no consumer can change", () => {
     const list = scrubEntry.TOKEN_PATH_TEMPLATES as unknown as unknown[][];
     const before = JSON.stringify(list.map(([re, to]) => [String(re), to]));

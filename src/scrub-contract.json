@@ -97,6 +97,11 @@
       "source": "^\\/+apply\\/+[^/?#]+",
       "flags": "i",
       "replacement": "/apply/[token]"
+    },
+    {
+      "source": "^\\/+services(?:\\/+[^/?#]+){3}",
+      "flags": "i",
+      "replacement": "/services/[webhook]"
     }
   ],
   "URL_KEYS": ["http.target", "http.url", "url.full", "url.original", "url.path"],
