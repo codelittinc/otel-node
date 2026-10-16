@@ -156,3 +156,61 @@ describe("RedactingSpanExporter — span names", () => {
     expect(exportSpan(SpanKind.INTERNAL, {}, name).name).toBe(name);
   });
 });
+
+// WHY: a Slack incoming-webhook URL is `/services/<team>/<bot>/<secret>`; the last two segments
+// are the secret, and an outbound fetch to it carries the whole URL on its client span.
+describe("RedactingSpanExporter — Slack webhook paths", () => {
+  const SEGMENTS = ["T0AAAAAAA", "B0BBBBBBB", "xoxbSECRETsecret123"];
+  const hook = (host = "https://hooks.slack.com") => `${host}/services/${SEGMENTS.join("/")}`;
+  const leaks = (span: ReturnType<typeof exportSpan>) => {
+    const text = JSON.stringify({
+      name: span.name,
+      attributes: span.attributes,
+      events: span.events,
+      links: span.links,
+      status: span.status,
+    });
+    return SEGMENTS.filter((segment) => text.includes(segment));
+  };
+
+  it("templates the path in url.full and http.url and leaks no segment anywhere", () => {
+    const span = exportSpan(SpanKind.CLIENT, { "url.full": hook(), "http.url": hook() });
+    expect(span.attributes["url.full"]).toBe("https://hooks.slack.com/services/[webhook]");
+    expect(span.attributes["http.url"]).toBe("https://hooks.slack.com/services/[webhook]");
+    expect(leaks(span)).toEqual([]);
+  });
+
+  it.each([
+    ["a query string", `${hook()}?x=1`, "https://hooks.slack.com/services/[webhook]"],
+    [
+      "doubled slashes",
+      "https://hooks.slack.com//services//T0AAAAAAA//B0BBBBBBB//xoxbSECRETsecret123",
+      "https://hooks.slack.com/services/[webhook]",
+    ],
+    [
+      "upper-case Services",
+      "https://hooks.slack.com/Services/T0AAAAAAA/B0BBBBBBB/xoxbSECRETsecret123",
+      "https://hooks.slack.com/services/[webhook]",
+    ],
+    [
+      "a trailing path",
+      `${hook()}/extra`,
+      "https://hooks.slack.com/services/[webhook]/extra",
+    ],
+    ["no scheme", "//hooks.slack.com/services/T0AAAAAAA/B0BBBBBBB/xoxbSECRETsecret123", "//hooks.slack.com/services/[webhook]"],
+    ["a bare path", "/services/T0AAAAAAA/B0BBBBBBB/xoxbSECRETsecret123", "/services/[webhook]"],
+  ])("templates %s", (_name, url, expected) => {
+    const span = exportSpan(SpanKind.CLIENT, { "url.full": url, "http.url": url });
+    expect(span.attributes["url.full"]).toBe(expected);
+    expect(span.attributes["http.url"]).toBe(expected);
+    expect(leaks(span)).toEqual([]);
+  });
+
+  it.each(["/services", "/services/foo", "/servicesX/a/b/c", "/services/a/b"])(
+    "leaves %s unchanged",
+    (path) => {
+      const span = exportSpan(SpanKind.CLIENT, { "url.full": `https://x.test${path}` });
+      expect(span.attributes["url.full"]).toBe(`https://x.test${path}`);
+    },
+  );
+});

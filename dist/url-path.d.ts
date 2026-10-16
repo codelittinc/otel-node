@@ -2,7 +2,8 @@
  * Paths whose segments are bearer secrets, with the template each becomes. Anchored at the start
  * of the path. An applicant intake token opens and submits an application for whoever holds it:
  * the web page (`/apply/[token]`) and the api routes it calls. Any letter case and any run of `/`
- * match, as a server routes them alike.
+ * match, as a server routes them alike. A Slack incoming webhook (`/services/<team>/<bot>/<secret>`)
+ * is host-agnostic like the rest: all three segments are replaced, the last two being the secret.
  */
 export declare const TOKEN_PATH_TEMPLATES: readonly (readonly [RegExp, string])[];
 /** Pinned by scrub-contract.test.ts: the agent's layer-2 span scrub repeats these. */
