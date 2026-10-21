@@ -90,7 +90,9 @@ Environment: `OTEL_EXPORTER_OTLP_ENDPOINT` (on/off), `OTEL_SDK_DISABLED=true` (k
 
 `bullmq` (`^6.3.8`) is an optional peer dependency, used only by the `./bullmq` entry, so an app
 without it typechecks the main entry even with `skipLibCheck` off. `bullmqTelemetry()` returns
-the adapter once telemetry has started, and `undefined` before.
+the adapter once telemetry has started, and `undefined` before. Each `moveStalledJobsToWait` (a
+Worker's stalled check, every 30 s per queue) starts a trace of its own; BullMQ would otherwise
+nest every check for the life of the process under one `startStalledCheckTimer` trace.
 
 ## Logging
 

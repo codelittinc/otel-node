@@ -11,6 +11,7 @@ import { logs } from "@opentelemetry/api-logs";
 import { resourceFromAttributes } from "@opentelemetry/resources";
 import { ATTR_SERVICE_INSTANCE_ID, ATTR_SERVICE_NAME, ATTR_SERVICE_VERSION, } from "@opentelemetry/semantic-conventions";
 import { BullMQOtel } from "bullmq-otel";
+import { rootLoopSpans } from "./bullmq-loops.js";
 import { buildInstrumentations } from "./instrumentations.js";
 import { metricViews } from "./metric-views.js";
 import { RedactingSpanExporter } from "./redacting-exporter.js";
@@ -74,7 +75,7 @@ export async function bootSdk(config, options) {
             // After the records the sink has already queued for emission.
             return Promise.resolve().then(() => sdk.shutdown());
         },
-        bullmq: new BullMQOtel({ tracerName: logScope }),
+        bullmq: rootLoopSpans(new BullMQOtel({ tracerName: logScope })),
     };
     if (exportLogs)
         setLogLineSink(logLineSink(logs.getLogger(logScope)));

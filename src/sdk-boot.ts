@@ -18,6 +18,7 @@ import { BullMQOtel } from "bullmq-otel";
 import type { Telemetry } from "bullmq";
 import type { Instrumentation } from "@opentelemetry/instrumentation";
 import type { TelemetryConfig } from "./config.js";
+import { rootLoopSpans } from "./bullmq-loops.js";
 import { buildInstrumentations } from "./instrumentations.js";
 import { metricViews } from "./metric-views.js";
 import type { MetricViewOptions } from "./options.js";
@@ -101,7 +102,7 @@ export async function bootSdk(config: TelemetryConfig, options: BootOptions): Pr
       // After the records the sink has already queued for emission.
       return Promise.resolve().then(() => sdk.shutdown());
     },
-    bullmq: new BullMQOtel({ tracerName: logScope }),
+    bullmq: rootLoopSpans(new BullMQOtel({ tracerName: logScope })),
   };
   if (exportLogs) setLogLineSink(logLineSink(logs.getLogger(logScope)));
   if (hook) await acknowledgedWithin(hook.waitForAllMessagesAcknowledged, HOOK_ACK_TIMEOUT_MS);
